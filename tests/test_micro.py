@@ -34,7 +34,7 @@ class Run:
         self.p60 = 0
         self.tick_hook = []
         self.keys = []
-        self.dos_strings, self.exited = [], False
+        self.dos_strings, self.exited, self.int10_dx = [], False, []
         if hlt_as_tick and self.com and 0xF4 in self.com:
             for off, b in enumerate(self.com):
                 if b == 0xF4: uc.mem_write(LIN + 0x100 + off, b"\x90"); self.hlt_at = LIN + 0x100 + off
@@ -63,6 +63,7 @@ class Run:
     def on_intr(self, uc, n, ud):
         ax = uc.reg_read(UC_X86_REG_AX)
         self.ints.append((n, ax, uc.reg_read(UC_X86_REG_CX), uc.reg_read(UC_X86_REG_BX)))
+        if n == 0x10: self.int10_dx.append(uc.reg_read(UC_X86_REG_DX))
         if n == 0x16 and self.keys:
             k = self.keys.pop(0); uc.reg_write(UC_X86_REG_AX, (0x1E << 8) | ord(k))     # BIOS returns scancode:ascii
         if n == 0x29: self.chars.append(ax & 0xFF)
@@ -259,6 +260,36 @@ blue = [c for c in range(2000) if w[c] == 0x0100]
 addr = [c for c in range(2000) if w[c] != 0x0100]
 check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and len(blue) == 1000 and all(c % 2 == blue[0] % 2 for c in blue), "every other cell is SI's start-up value 0100h (a blank cell, blue attribute)")
 check(all(w[c] == 2 * c + 2 for c in addr), "and the cells between hold their own address, as in STACKMAP")
+
+# ---------------------------------------------------------------- CODEPAL
+print("\n== CODEPAL ==")
+r = Run("CODEPAL.COM").run(500)
+size_gate("CODEPAL", r, 8)
+calls = [(ax, cx, bx) for n, ax, cx, bx in r.ints if n == 0x10]
+check(calls == [(0x1012, 0xFF, 0)] and r.int10_dx == [0x100] and r.exited, "one INT 10h, AX = 1012h (load DAC registers), BX = 0, CX = 255, ES:DX = 0100h: the program's own bytes; then it exits")
+check(r.com[:3] == b"\xB8\x12\x10" and r.com[3:5] == b"\x89\xF2", "so DAC colour 0 is B8 12 10 (red 38h, green 12h, blue 10h in 6 bits) and colour 1 is 89 F2 CD")
+
+# ---------------------------------------------------------------- PSPPAL
+print("\n== PSPPAL ==")
+r = Run("PSPPAL.COM").run(500)
+size_gate("PSPPAL", r, 7)
+calls = [(ax, cx, bx) for n, ax, cx, bx in r.ints if n == 0x10]
+check(calls == [(0x1012, 0xFF, 0)] and r.int10_dx == [0] and r.exited, "one INT 10h, AX = 1012h, BX = 0, CX = 255, ES:DX = 0: the start of the PSP (CWD makes DX = 0); then it exits")
+
+# ---------------------------------------------------------------- NOISEPAL
+print("\n== NOISEPAL ==")
+r = Run("NOISEPAL.COM").run(4000)
+size_gate("NOISEPAL", r, 8)
+outs = [(p, v) for p, sz, v in r.outs]
+check(len(outs) > 500 and all(p == 0x3C9 for p, v in outs), "every write goes to the VGA DAC data port 3C9h")
+check([v for p, v in outs] == [(13 * (i + 1)) & 255 for i in range(len(outs))], "each value is the timer counter (port 40h) just read: random colour components for red, green, blue, red, ...")
+check(bytes(r.uc.mem_read(0xB8000, 4000)) == bytes(4000), "and no screen memory is touched: the picture is whatever was already there")
+
+# ---------------------------------------------------------------- MODE3
+print("\n== MODE3 ==")
+r = Run("MODE3.COM").run(500)
+size_gate("MODE3", r, 5)
+check([ax for n, ax, cx, bx in r.ints if n == 0x10] == [3] and r.exited, "one INT 10h with AX = 3 (set video mode 3: 80x25 text, default palette), then it exits")
 
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)

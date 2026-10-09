@@ -1,14 +1,14 @@
 # UBER micro demos
 
-**Twenty DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
+**Twenty-four DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
-![Twelve of the demos in DOSBox](docs/gallery.jpg)
+![Sixteen of the demos in DOSBox](docs/gallery.jpg)
 
-*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, SNOW, MIRROR (its own machine code under the
-command). Row 3: PSPBACK (`PSPBACK hello tiny world` prints the command line reversed), KEYSCAN (after a key press), STRIPE, and TALL
-(80x50 text). BIG (40x25) is not shown.*
+*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, WEAVE, SNOW. Row 3: MIRROR, PSPBACK
+(`PSPBACK hello tiny world`), KEYSCAN (after a key press), STRIPE. Row 4: CODEPAL, PSPPAL (the two that recolour the DOS screen and
+exit), NOISEPAL (one frame of the churn) and TALL (80x50).*
 
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
@@ -33,6 +33,10 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **GEIGER** | 7 | a **Geiger counter**: random clicks, 18 a second |
 | **TYPER** | 7 | a **typewriter**: whatever you press is echoed back |
 | **KEYSCAN** | 6 | floods the screen with the glyph of the **last keyboard scancode** |
+| **CODEPAL** | 8 | the program's **own machine code becomes the screen's palette**, and the colours stay after it exits (the DOS screen turns salmon and green) |
+| **PSPPAL** | 7 | **DOS's Program Segment Prefix becomes the palette**, then exit: the screen turns blue, purple and green, machine-dependent colours |
+| **NOISEPAL** | 8 | a **palette-only** demo: no pixel is touched; the timer's counter is streamed into all 256 DAC colours, so the screen's colours churn |
+| **MODE3** | 5 | back to **80x25 text** with the default palette: undoes BIG, TALL, CODEPAL and PSPPAL |
 | **BIG** | 4 | **40x25** text (`inc ax` / `int 10h`: AX = 1 is a video mode), then exits |
 | **TALL** | 6 | **80x50** text (the BIOS reloads the 8x8 font), then exits |
 
@@ -43,12 +47,12 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 
 ```sh
 ./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave snow breath stripe mirror pspback keyscan big tall buzz static ticker geiger typer
+./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
 
-**Only MIRROR, PSPBACK, BIG and TALL exit; the rest never do** (there is no room for the keyboard check): close DOSBox, or press Ctrl+F9 in it.
+**Only MIRROR, PSPBACK, BIG, TALL, CODEPAL, PSPPAL and MODE3 exit; the rest never do** (there is no room for the keyboard check): close DOSBox, or press Ctrl+F9 in it.
 **The launcher pins DOSBox to about 3 MIPS** (`cycles=3000` in `DOSBOX.CONF`). These demos have no room for
 timing code, so their speed *is* the CPU's speed: at `cycles=max`, STKRAIN, SNOW, BUZZ and STATIC are an
 unreadable blur or an inaudible whine. BREATH, TICKER and GEIGER pace themselves with `HLT`.
@@ -68,6 +72,12 @@ it, a known set of registers and the BIOS. Several demos here have almost no ren
   `AX=0 BX=0 CX=00FF DX=0192 SI=0100 DI=FFFE BP=091C SP=FFFE`, all four segments `0192`, flags `7202`; the DX and flags are one of the
   things that vary.)
 - **Hardware as the program** (BIG, TALL, BREATH, STRIPE, the speaker demos): one BIOS or port call does all the work.
+- **Demos that outlive the program** (CODEPAL, PSPPAL, BIG, TALL): the program spends a few microseconds configuring the VGA and exits;
+  the hardware keeps the effect. CODEPAL and PSPPAL call BIOS "load DAC registers" with `ES:DX` pointing at *memory that already exists*: the program's
+  own bytes, or the PSP. Nothing is drawn, yet the whole DOS screen changes colour. (`MODE3` puts it back.) PSPPAL's colours are DOS's: the first
+  PSP bytes are `CD 20` and the top-of-memory segment, so a different DOS gives different colours.
+- **Palette-only** (NOISEPAL): pixels are never touched. Whatever is on the screen is recoloured, 70 times a second, by the timer. **It flashes
+  rapidly through random colours: do not run it if you are sensitive to flicker.** The same goes, more mildly, for STRIPE and BREATH.
 
 **Rules of the game.** *Strict 8*: exactly 8 bytes or fewer in the `.COM`, no payload, no data file, an ordinary launch with no
 arguments. Every demo here is strict except PSPBACK, which is *wild* (it reads your command line). KEYSCAN and TYPER want keys.
@@ -86,6 +96,7 @@ made a clearly different picture live in DOSBox are FLUX (`dec cx` in the `pusha
 - *Self-walking opcodes*: a program that increments its own `jmp` displacement lands mid-instruction on the second iteration; in the
   emulator the mis-decoded bytes printed one character and then ended the program. Not an image.
 - *Text-mode scroll feedback*: the BIOS scroll needs a window in `CX`/`DX`, and the entry state (`CX = 00FF`) is an empty window.
+- *Keyboard LEDs as pixels*: the controller needs an acknowledgement between the command byte and the data byte, and nothing here can show whether it works.
 - *DOSBox crashes*: a stack-art variant that pushed `ss` and `sp` alternately closed DOSBox outright; I dropped it.
 
 ## How they work
@@ -105,6 +116,18 @@ screen, and as `SP` counts down and wraps around the 64 KB segment it walks acro
 
 **FLUX** is STATE with `dec cx` in the loop: CX is one lower for each tile pushed, so its column drifts as well as the SP column. **WEAVE**
 is `push sp` / `push si`: DOS gives `SI = 0100h`, a blank cell with a blue attribute, so it alternates with the address map.
+
+**CODEPAL, PSPPAL**: BIOS `INT 10h` AX = 1012h loads `CX` DAC colour registers, starting at `BX`, from the 3-byte entries at `ES:DX`.
+DOS leaves `BX = 0` and `CX = 00FFh`, so one call recolours 255 colours; each is three bytes (red, green, blue) of which the DAC keeps six
+bits. CODEPAL points `DX` at itself (`mov dx,si`: DOS gives `SI = 0100h`), so colour 0, the background, is its own first three bytes
+`B8 12 10`: a salmon red, and colour 1 is `89 F2 CD`. The rest of the table is zeros, so most colours go black. PSPPAL needs one byte fewer: `cwd`
+makes `DX = 0` (AX is positive), which is the start of the PSP, so colour 0 is `CD 20 FF` (light blue) and colour 1 is the next three bytes.
+
+**NOISEPAL**: the DAC data port is `3C9h`; after a mode set the write index is 0 and then auto-increments through all 256 colours, three bytes
+each. `in al,40h` / `out dx,al` in a loop streams the timer counter in, so every colour (the background, the text, everything) is replaced by random
+values over and over, and DOSBox redraws the unchanged screen with each new palette.
+
+**MODE3**: `mov al,3` (AX = 0 at entry) / `int 10h`: set mode 3, which also reloads the default palette.
 
 **STATE**: `pusha` is one byte that pushes AX, CX, DX, BX, SP, BP, SI, DI. With the stack on the screen, those eight words become an
 8-cell tile, repeated down the whole page; the SP cell is the only one that changes (it counts down by 16 each time), so it reads as

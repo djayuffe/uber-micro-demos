@@ -3,6 +3,15 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.5.0] - 2026-10-10
+
+### Added
+- **Demos that outlive the program**, from a list of "let the machine do the work" ideas: **CODEPAL** (8 bytes: BIOS load-DAC-registers with the
+  program's own bytes as the table), **PSPPAL** (7: the same with DOS's Program Segment Prefix), both of which recolour the DOS screen and exit; and
+  **NOISEPAL** (8: a palette-only demo that streams the timer counter into all 256 colours, never touching a pixel; it flashes, with a warning).
+- **MODE3** (5 bytes): set 80x25 text, which reloads the default palette: the undo for BIG, TALL, CODEPAL and PSPPAL.
+- All verified live in DOSBox; the gallery is sixteen real captures. 24 demos.
+
 ## [1.4.0] - 2026-10-10
 
 ### Added
