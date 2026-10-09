@@ -3,6 +3,13 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.6.0] - 2026-10-10
+
+### Added
+- **EVO1** and **EVO2** (8 bytes each): found by a genetic search over 8-byte programs in the emulated CPU (structure, change over time and colour
+  variety as fitness), then verified live. Honest summary in the README: it refined the seed family rather than inventing a technique, but it found two
+  unfamiliar ingredients (a stack segment that is not `B800h`, and `cmpsw`/`cmpsb` as a one-byte way to drift SI and DI). 26 demos.
+
 ## [1.5.0] - 2026-10-10
 
 ### Added

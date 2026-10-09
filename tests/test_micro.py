@@ -291,5 +291,16 @@ r = Run("MODE3.COM").run(500)
 size_gate("MODE3", r, 5)
 check([ax for n, ax, cx, bx in r.ints if n == 0x10] == [3] and r.exited, "one INT 10h with AX = 3 (set video mode 3: 80x25 text, default palette), then it exits")
 
+# ---------------------------------------------------------------- EVO1 / EVO2
+for name, seg, op in (("EVO1", 0xB0FD, 0xA7), ("EVO2", 0xB0DD, 0xA6)):
+    print(f"\n== {name} ==")
+    r = Run(f"{name}.COM").run(600_000)
+    size_gate(name, r, 8)
+    check(r.com == bytes([0x68, seg & 255, seg >> 8, 0x17, 0x60, op, 0xEB, 0xFC]), f"push {seg:04X}h / pop ss / pusha / {'cmpsw' if op == 0xA7 else 'cmpsb'} / jmp")
+    w = [word(r, 0xB8000 + 2 * c) for c in range(2000)]
+    bp = [c for c in range(2000) if w[c] == 0x091C]
+    check(r.uc.reg_read(UC_X86_REG_SS) == seg and len(bp) > 150 and max(sum(1 for c in bp if c % 8 == k) for k in range(8)) >= 0.95 * len(bp), "the stack segment is off the text page, yet the register tile still shows up on it: BP's start-up value 091Ch sits in one column of every tile (the drifting DI or SI column meets 091Ch only by chance)")
+    check(len(set(w)) > 400, f"and the screen is rich: {len(set(w))} distinct cells, with the SI and DI columns drifting")
+
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)

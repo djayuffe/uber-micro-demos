@@ -1,14 +1,14 @@
 # UBER micro demos
 
-**Twenty-four DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
+**Twenty-six DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
-![Sixteen of the demos in DOSBox](docs/gallery.jpg)
+![Nineteen of the demos in DOSBox](docs/gallery.jpg)
 
-*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, WEAVE, SNOW. Row 3: MIRROR, PSPBACK
-(`PSPBACK hello tiny world`), KEYSCAN (after a key press), STRIPE. Row 4: CODEPAL, PSPPAL (the two that recolour the DOS screen and
-exit), NOISEPAL (one frame of the churn) and TALL (80x50).*
+*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, WEAVE, EVO1. Row 3: EVO2, SNOW, MIRROR, PSPBACK
+(`PSPBACK hello tiny world`). Row 4: KEYSCAN (after a key press), STRIPE, CODEPAL, PSPPAL (the two that recolour the DOS screen and exit).
+Row 5: NOISEPAL (one frame of the churn), TALL (80x50), BIG (40x25).*
 
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
@@ -21,6 +21,8 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **STATE** | 7 | the **machine's start-up state**, painted: `pusha` stacks the eight registers DOS left behind, as a tile that repeats across the screen |
 | **FLUX** | 8 | STATE with a **second moving column**: `dec cx` makes CX one lower for every tile, so two glyph columns drift |
 | **WEAVE** | 8 | the address map **woven** with SI's start-up value: every other cell is a blank blue one |
+| **EVO1** | 8 | **found by evolution**: a stack segment that overlaps the text page out of phase, with SI and DI drifting: dense columns of glyphs |
+| **EVO2** | 8 | EVO1's cousin (another segment, `cmpsb` for `cmpsw`): a blue wall with colourful glyph strips |
 | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
 | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
@@ -47,7 +49,7 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 
 ```sh
 ./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
+./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave evo1 evo2 snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
@@ -82,6 +84,17 @@ it, a known set of registers and the BIOS. Several demos here have almost no ren
 **Rules of the game.** *Strict 8*: exactly 8 bytes or fewer in the `.COM`, no payload, no data file, an ordinary launch with no
 arguments. Every demo here is strict except PSPBACK, which is *wild* (it reads your command line). KEYSCAN and TYPER want keys.
 
+**Found by evolution** (EVO1, EVO2). A small genetic algorithm: genomes are 8 raw bytes; each is run in the emulated CPU for 90,000
+instructions with a "teletype" standing in for `int 29h`, and the screen is sampled at three moments. Fitness rewards *structure* (distinct
+cells on the screen), *change over time* (a fraction of cells that changes between samples, neither frozen nor all noise), and *colour variety*, and
+punishes anything that crashes, exits or blocks. Mutation (byte, bit, insert, delete, swap) and crossover, seeded with the demos here plus random
+variants; 4 runs of 40 generations of 60 genomes, about 240 distinct programs scored. Honest result: it did **not** invent a new technique. It refined the
+seed it was given (STATE with a moving column): the whole top of the table was one family, `push imm16 / pop ss / pusha / cmps? / jmp`. The two things it
+found that I had not tried: (1) the stack segment need not be `B800h`: `B0FDh` and `B0DDh` put the stack's 64 KB window *across* the text page out of
+phase, so the 8-cell register tile no longer lines up with the 80-column screen; (2) `cmpsw` and `cmpsb` are the cheapest way to make SI *and* DI drift at
+once (one byte, and a side effect nobody uses). Both are live-verified in DOSBox. Everything it ranked highly was a screen; a fitness that could hear the
+speaker or see the palette would need a more complete emulation of the BIOS than I wrote.
+
 **Found by search.** FLUX and WEAVE came from a brute-force run: about 73,000 random 8-byte programs (built from a pool of useful
 instructions, each ending in a short backward jump) run in an emulated 16-bit CPU with DOSBox's start-up registers, scored on how rich
 the text screen or the printed stream became. About 245 scored at all, and nearly all were variants of programs already here (STACKMAP
@@ -113,6 +126,10 @@ screen, and as `SP` counts down and wraps around the 64 KB segment it walks acro
 - **STKRAIN**: `inc ax` / `push ax` writes a counter; character = low byte, colour = high byte.
 - **BULLETS**: `call` to itself. The return address `0107h` is pushed over and over: character `07h` (a bullet),
   colour `01h` (blue).
+
+**EVO1** and **EVO2**: `push 0B0FDh` / `pop ss` (or `0B0DDh`) sets a stack whose 64 KB window starts a little below the text page and runs across it, so
+`pusha`'s 16-byte tiles land out of phase with the screen's 160-byte rows and each row's columns shift; `cmpsw` (or `cmpsb`) then compares `[SI]` with `[ES:DI]`
+and advances both pointers, so the SI and DI cells of each tile count up instead of staying constant. Nothing was designed.
 
 **FLUX** is STATE with `dec cx` in the loop: CX is one lower for each tile pushed, so its column drifts as well as the SP column. **WEAVE**
 is `push sp` / `push si`: DOS gives `SI = 0100h`, a blank cell with a blue attribute, so it alternates with the address map.
