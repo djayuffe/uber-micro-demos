@@ -240,5 +240,25 @@ ok = all(w[c] == want[c % 8] for c in range(2000) if c % 8 in want)
 check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and ok, "the screen is an 8-cell tile repeated: SI, BP, (SP), BX, DX, CX, AX, DI exactly as the machine started the program")
 check(len({w[c] for c in range(2, 2000, 8)}) > 100, "and the SP cell of each tile counts down by 16: a glyph column that drifts")
 
+# ---------------------------------------------------------------- FLUX
+print("\n== FLUX ==")
+r = Run("FLUX.COM").run(500_000)
+size_gate("FLUX", r, 8)
+w = [word(r, 0xB8000 + 2 * c) for c in range(2000)]
+want = {0: 0x0100, 1: 0x091C, 3: 0x0000, 4: SEG, 6: 0x0000, 7: 0xFFFE}
+check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and all(w[c] == want[c % 8] for c in range(2000) if c % 8 in want), "an 8-cell register tile as in STATE: SI, BP, BX, DX, AX, DI as DOS left them")
+steps = {(b - a) & 0xFFFF for a, b in zip(w[5::8], w[13::8])}
+check(steps == {1} and len({w[c] for c in range(5, 2000, 8)}) > 100, f"but CX, which is one lower for each tile pushed, makes a second drifting column (tile-to-tile steps {sorted(steps)})")
+
+# ---------------------------------------------------------------- WEAVE
+print("\n== WEAVE ==")
+r = Run("WEAVE.COM").run(500_000)
+size_gate("WEAVE", r, 8)
+w = [word(r, 0xB8000 + 2 * c) for c in range(2000)]
+blue = [c for c in range(2000) if w[c] == 0x0100]
+addr = [c for c in range(2000) if w[c] != 0x0100]
+check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and len(blue) == 1000 and all(c % 2 == blue[0] % 2 for c in blue), "every other cell is SI's start-up value 0100h (a blank cell, blue attribute)")
+check(all(w[c] == 2 * c + 2 for c in addr), "and the cells between hold their own address, as in STACKMAP")
+
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)

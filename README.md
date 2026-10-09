@@ -1,14 +1,14 @@
 # UBER micro demos
 
-**Eighteen DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
+**Twenty DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
 ![Twelve of the demos in DOSBox](docs/gallery.jpg)
 
-*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, SNOW, MIRROR (its own machine code under the command),
-PSPBACK (`PSPBACK hello tiny world` prints the command line reversed). Row 3: KEYSCAN (after a key press), STRIPE, TALL (80x50 text) and
-BIG (40x25).*
+*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, SNOW, MIRROR (its own machine code under the
+command). Row 3: PSPBACK (`PSPBACK hello tiny world` prints the command line reversed), KEYSCAN (after a key press), STRIPE, and TALL
+(80x50 text). BIG (40x25) is not shown.*
 
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
@@ -19,6 +19,8 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **STKRAIN** | 8 | the stack is the screen again, and a counter pours down it: a rainbow of every character |
 | **BULLETS** | 7 | infinite **recursion** with the stack on the screen: every `CALL` pushes a return address, and the screen fills with blue bullets |
 | **STATE** | 7 | the **machine's start-up state**, painted: `pusha` stacks the eight registers DOS left behind, as a tile that repeats across the screen |
+| **FLUX** | 8 | STATE with a **second moving column**: `dec cx` makes CX one lower for every tile, so two glyph columns drift |
+| **WEAVE** | 8 | the address map **woven** with SI's start-up value: every other cell is a blank blue one |
 | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
 | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
@@ -41,7 +43,7 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 
 ```sh
 ./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state snow breath stripe mirror pspback keyscan big tall buzz static ticker geiger typer
+./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave snow breath stripe mirror pspback keyscan big tall buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
@@ -70,6 +72,12 @@ it, a known set of registers and the BIOS. Several demos here have almost no ren
 **Rules of the game.** *Strict 8*: exactly 8 bytes or fewer in the `.COM`, no payload, no data file, an ordinary launch with no
 arguments. Every demo here is strict except PSPBACK, which is *wild* (it reads your command line). KEYSCAN and TYPER want keys.
 
+**Found by search.** FLUX and WEAVE came from a brute-force run: about 73,000 random 8-byte programs (built from a pool of useful
+instructions, each ending in a short backward jump) run in an emulated 16-bit CPU with DOSBox's start-up registers, scored on how rich
+the text screen or the printed stream became. About 245 scored at all, and nearly all were variants of programs already here (STACKMAP
+with a spare instruction, SNOW and the ASCII table with a different register, STATE with a different counter); the two that
+made a clearly different picture live in DOSBox are FLUX (`dec cx` in the `pusha` loop) and WEAVE (`push si` beside `push sp`).
+
 **What I tried and could not use.**
 - *CRT-controller abuse* (sweeping the start address or horizontal parameters): it needs 11 bytes for the port, the register index and the
   loop, and wild CRTC values can stress a real monitor, so I did not ship it.
@@ -94,6 +102,9 @@ screen, and as `SP` counts down and wraps around the 64 KB segment it walks acro
 - **STKRAIN**: `inc ax` / `push ax` writes a counter; character = low byte, colour = high byte.
 - **BULLETS**: `call` to itself. The return address `0107h` is pushed over and over: character `07h` (a bullet),
   colour `01h` (blue).
+
+**FLUX** is STATE with `dec cx` in the loop: CX is one lower for each tile pushed, so its column drifts as well as the SP column. **WEAVE**
+is `push sp` / `push si`: DOS gives `SI = 0100h`, a blank cell with a blue attribute, so it alternates with the address map.
 
 **STATE**: `pusha` is one byte that pushes AX, CX, DX, BX, SP, BP, SI, DI. With the stack on the screen, those eight words become an
 8-cell tile, repeated down the whole page; the SP cell is the only one that changes (it counts down by 16 each time), so it reads as

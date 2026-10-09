@@ -3,6 +3,12 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.4.0] - 2026-10-10
+
+### Added
+- **FLUX** (8 bytes: STATE plus `dec cx`, a second drifting column) and **WEAVE** (8: `push sp` / `push si`), both found by a brute-force
+  search of ~73,000 random 8-byte programs in an emulated CPU, then verified live in DOSBox. 20 demos.
+
 ## [1.3.0] - 2026-10-10
 
 ### Added
