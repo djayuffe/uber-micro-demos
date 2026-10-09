@@ -1,6 +1,6 @@
 # UBER micro demos
 
-**Twenty-six DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
+**Twenty-eight DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, four that make noise, and two that are two programs in the same eight bytes.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
@@ -23,6 +23,8 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **WEAVE** | 8 | the address map **woven** with SI's start-up value: every other cell is a blank blue one |
 | **EVO1** | 8 | **found by evolution**: a stack segment that overlaps the text page out of phase, with SI and DI drifting: dense columns of glyphs |
 | **EVO2** | 8 | EVO1's cousin (another segment, `cmpsb` for `cmpsw`): a blue wall with colourful glyph strips |
+| **OVERLAP** | 8 | **two programs in the same bytes**: the `JMP` lands one byte inside the first instruction, so `lds si,[bx+si]` becomes `xor [si],al` / `lodsw` / `out 61h,al`. It feeds memory to the speaker and **corrodes the DOS screen** (the walk crosses the text page). Silent over empty memory. |
+| **OVERSUB** | 8 | OVERLAP with `sub` for `xor` (30h becomes 28h, so `lds` loads BP and SI stays put): AL flips ADh, 53h, ADh..., so the speaker toggles on every write, and the screen fills with random characters |
 | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
 | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
@@ -49,7 +51,7 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 
 ```sh
 ./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state flux weave evo1 evo2 snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
+./run-dosbox.sh stkrain   # any of: overlap oversub stackmap spectrum stkrain bullets state flux weave evo1 evo2 snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
@@ -58,6 +60,17 @@ Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --
 **The launcher pins DOSBox to about 3 MIPS** (`cycles=3000` in `DOSBOX.CONF`). These demos have no room for
 timing code, so their speed *is* the CPU's speed: at `cycles=max`, STKRAIN, SNOW, BUZZ and STATIC are an
 unreadable blur or an inaudible whine. BREATH, TICKER and GEIGER pace themselves with `HLT`.
+
+## Overlapping instructions
+
+OVERLAP and OVERSUB (idea from a pasted note on the 8-byte `C5 30 04 AD E6 61 EB F9` trick) run the same bytes
+twice, decoded two ways. Pass 1 is `lds si,[bx+si]` / `add al,0ADh` / `out 61h,al` / `jmp`; the jump lands on the 30h
+inside the first instruction, and from then on the loop is `xor [si],al` / `lodsw` / `out 61h,al` / `jmp`. Two things
+the note got wrong, found by running it: DOS enters a `.COM` with `SI = 0100h`, not 0, so `lds` reads the **program's own bytes**
+(DS = AD04h, SI = 30C5h), not the PSP; and that window (AD040h-BD03Fh) **includes the B800h text page**, so it is
+not harmless in text mode: it scrambles the screen. Over empty memory the XOR version is silent (AL stays ADh),
+which is why OVERSUB exists. Both are checked in the emulator; the sound itself is unheard, and with no delay the
+tone is far above hearing range, so any audible result is aliasing in the audio path.
 
 ## Found-memory demos
 

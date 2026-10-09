@@ -3,6 +3,12 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.7.0] - 2026-10-09
+
+### Added
+- **OVERLAP** and **OVERSUB** (8 bytes each): overlapping-instruction demos (a jump into the middle of the first instruction). They walk the VGA/text
+  window into the speaker port and scramble the DOS screen. 28 demos. Corrects the source note: SI is 0100h at entry, so `lds` reads the program itself, and the walk is not harmless in text mode.
+
 ## [1.6.0] - 2026-10-10
 
 ### Added

@@ -302,5 +302,32 @@ for name, seg, op in (("EVO1", 0xB0FD, 0xA7), ("EVO2", 0xB0DD, 0xA6)):
     check(r.uc.reg_read(UC_X86_REG_SS) == seg and len(bp) > 150 and max(sum(1 for c in bp if c % 8 == k) for k in range(8)) >= 0.95 * len(bp), "the stack segment is off the text page, yet the register tile still shows up on it: BP's start-up value 091Ch sits in one column of every tile (the drifting DI or SI column meets 091Ch only by chance)")
     check(len(set(w)) > 400, f"and the screen is rich: {len(set(w))} distinct cells, with the SI and DI columns drifting")
 
+# ---------------------------------------------------------------- OVERLAP / OVERSUB
+import random
+for name, mid, mnem in (("OVERLAP", 0x30, "xor"), ("OVERSUB", 0x28, "sub")):
+    print(f"\n== {name} ==")
+    want = bytes([0xC5, mid, 0x04, 0xAD, 0xE6, 0x61, 0xEB, 0xF9])
+    r = Run(f"{name}.COM"); size_gate(name, r, 8)
+    check(r.com == want, f"bytes C5 {mid:02X} 04 AD E6 61 EB F9: the JMP lands one byte into the first instruction, so the same bytes decode as {mnem} [si],al / lodsw / out 61h,al / jmp")
+    r.run(100_000)
+    ds = r.uc.reg_read(UC_X86_REG_DS)
+    check(ds == 0xAD04, f"pass 1 loads DS from the program's own bytes (SI = 0100h at entry, not the PSP): DS = {ds:04X}h")
+    vals = [v for p, s_, v in r.outs if p == 0x61]
+    check(len(vals) > 5000 and vals[0] == 0xAD and not r.unmapped, f"first speaker write is ADh, then it loops without any delay ({len(vals)} writes)")
+    toggles = sum(1 for a, b in zip(vals, vals[1:]) if (a ^ b) & 2)
+    if name == "OVERSUB":
+        check(vals[:4] == [0xAD, 0x53, 0xAD, 0x53] and toggles == len(vals) - 1, "SUB negates AL every step, so the speaker cone toggles on every write even over empty memory")
+    else:
+        check(toggles == 0, "over empty memory XOR leaves AL at ADh: no tone at all (it only sounds when the memory it walks holds data)")
+    # now with data in the window DS:SI walks (AD040h-BD03Fh, which includes the B800h text page)
+    r2 = Run(f"{name}.COM"); rnd = random.Random(1)
+    r2.uc.mem_write(0xAD040, bytes(rnd.randrange(256) for _ in range(0x10000)))
+    before = bytes(r2.uc.mem_read(0xB8000, 4000)); r2.run(300_000)
+    vals = [v for p, s_, v in r2.outs if p == 0x61]
+    toggles = sum(1 for a, b in zip(vals, vals[1:]) if (a ^ b) & 2)
+    check(len(set(vals)) > 200 and toggles > len(vals) * 0.3, f"with data in memory the output is noise: {len(set(vals))} distinct values, {toggles} cone toggles in {len(vals)} writes")
+    after = bytes(r2.uc.mem_read(0xB8000, 4000))
+    check(sum(1 for a, b in zip(before, after) if a != b) > 200, "and the walk crosses the B800h text page, so it also corrupts the screen: a noise-and-glitch demo")
+
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)
