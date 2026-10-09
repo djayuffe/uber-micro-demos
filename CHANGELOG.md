@@ -3,6 +3,16 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.2.0] - 2026-10-10
+
+### Added
+- **SPECTRUM** (8 bytes): STACKMAP with `dec sp`, so every pushed word straddles two screen cells and the address map
+  becomes a wall of colour.
+- **MIRROR** (8 bytes): prints its own machine code with DOS function 9 (the eighth byte of the file is the `$`) and exits
+  cleanly. The only demo that does.
+- **STRIPE** (8 bytes): a three-row colour band, a new colour every timer tick (BIOS write-attribute with `CX = 255`).
+- All three checked live in DOSBox; the README gallery now shows six real captures.
+
 ## [1.1.0] - 2026-10-10
 
 ### Changed

@@ -32,6 +32,7 @@ class Run:
         self.p61, self.pit, self.pit_step = port61, 0, pit_step
         self.tick_hook = []
         self.keys = []
+        self.dos_strings, self.exited = [], False
         if hlt_as_tick and self.com and 0xF4 in self.com:
             for off, b in enumerate(self.com):
                 if b == 0xF4: uc.mem_write(LIN + 0x100 + off, b"\x90"); self.hlt_at = LIN + 0x100 + off
@@ -62,11 +63,14 @@ class Run:
         if n == 0x16 and self.keys:
             k = self.keys.pop(0); uc.reg_write(UC_X86_REG_AX, (0x1E << 8) | ord(k))     # BIOS returns scancode:ascii
         if n == 0x29: self.chars.append(ax & 0xFF)
-        elif n == 0x20: uc.emu_stop()
+        elif n == 0x20: self.exited = True; uc.emu_stop()
+        if n == 0x21 and ax >> 8 == 9:                  # DOS print string: read DS:DX up to '$'
+            base = (uc.reg_read(UC_X86_REG_DS) << 4) + uc.reg_read(UC_X86_REG_DX)
+            buf = bytes(uc.mem_read(base, 64)); self.dos_strings.append(buf[:buf.index(b'$')])
 
     def run(self, instructions):
         done = 0
-        while done < instructions:
+        while done < instructions and not self.exited:
             n = min(1_000_000, instructions - done)
             self.uc.emu_start(self.uc.reg_read(UC_X86_REG_IP) if done else 0x100, 0xFFFF0, count=n)
             done += n
@@ -162,6 +166,32 @@ size_gate("TYPER", r, 7)
 calls = [ax for n, ax, cx, bx in r.ints if n == 0x16]
 check(len(calls) > 12 and all(ax >> 8 == 0 for ax in calls), "waits for a key with BIOS INT 16h, AH = 0 on every call (CBW clears the scan code)")
 check(r.chars[:12] == [ord(c) for c in "hello, world"], "and prints each key it gets, in order")
+
+# ---------------------------------------------------------------- MIRROR
+print("\n== MIRROR ==")
+r = Run("MIRROR.COM").run(2000)
+size_gate("MIRROR", r, 8)
+check(r.dos_strings == [r.com[:-1]], f"DOS print-string is called once, with the program's own bytes up to the '$': {r.dos_strings[0].hex() if r.dos_strings else None}")
+check(r.com[-1:] == b"$" and r.exited, "the eighth byte is the '$' terminator, and RET returns to the PSP's INT 20h: it exits cleanly")
+
+# ---------------------------------------------------------------- SPECTRUM
+print("\n== SPECTRUM ==")
+r = Run("SPECTRUM.COM").run(400_000)
+size_gate("SPECTRUM", r, 8)
+mem = bytes(r.uc.mem_read(0xB8000, 4000))
+ok_attr = all(mem[2 * c + 1] == (2 * c + 3) & 255 for c in range(1999))
+ok_char = all(mem[2 * c + 2] == (2 * c + 3) >> 8 for c in range(1999))
+check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and (r.uc.reg_read(UC_X86_REG_SP) & 1) == 1, "the stack is the text screen and SP is odd, so every pushed word straddles two cells")
+check(ok_attr and ok_char, "each cell's colour byte is the low byte of its address and each glyph byte the high byte: a colour that changes every cell, a glyph that changes every 128")
+check(len({mem[i] for i in range(1, 4000, 2)}) >= 100, "so the screen is a wall of different colour attributes")
+
+# ---------------------------------------------------------------- STRIPE
+print("\n== STRIPE ==")
+r = Run("STRIPE.COM", hlt_as_tick=True).run(4000)
+size_gate("STRIPE", r, 8)
+writes = [(ax, cx, bx) for n, ax, cx, bx in r.ints if n == 0x10]
+check(len(writes) > 200 and all(ax >> 8 == 9 and ax & 255 == 0 and cx == 0xFF for ax, cx, bx in writes), f"BIOS write-character-and-attribute (AH = 9) of a blank, 255 cells, every time ({len(writes)} calls)")
+check(all(b - a == 1 for a, b in zip([w[2] for w in writes], [w[2] for w in writes][1:])) and r.ticks >= len(writes) - 1, "the attribute (BL) counts up by one per call, with a timer tick between calls: a new colour every 55 ms")
 
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)
