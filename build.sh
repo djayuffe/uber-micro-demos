@@ -5,9 +5,10 @@ cd "$(dirname "$0")"
 command -v nasm >/dev/null 2>&1 || { echo 'ERROR: NASM is required.' >&2; exit 1; }
 fail=0
 : > SHA256SUMS.tmp
-for spec in stackmap:7 stackrain:8 bullets:7 xray:7 breath:8 buzz:8 static:6 ticker:6 geiger:7 typer:8; do
+for spec in stackmap:7 stkrain:8 bullets:7 snow:8 breath:8 buzz:8 static:6 ticker:6 geiger:7 typer:8; do
     name=${spec%%:*}; budget=${spec##*:}
     upper=$(echo "$name" | tr 'a-z' 'A-Z')
+    [ "${#name}" -le 8 ] || { echo "ERROR: $upper.COM is not a valid 8.3 DOS file name" >&2; fail=1; }
     nasm -f bin -Wall -Werror "src/$name.asm" -o "$upper.COM"
     size=$(wc -c < "$upper.COM" | tr -d ' ')
     printf '%-14s %s bytes (budget %s)\n' "$upper.COM" "$size" "$budget"

@@ -87,10 +87,10 @@ cells = [word(r, 0xB8000 + a) for a in range(0, 4000, 2)]
 check(all(c == a + 2 for c, a in zip(cells, range(0, 4000, 2))), "every screen cell holds its own address (+2): character = low byte, colour = high byte")
 check(len({c & 255 for c in cells[:80]}) == 80 and len({c >> 8 for c in cells}) >= 15, "so the screen is a map: 80 different characters per row, and colours that step down it")
 
-# ---------------------------------------------------------------- STACKRAIN
-print("\n== STACKRAIN ==")
-r = Run("STACKRAIN.COM").run(400_000)
-size_gate("STACKRAIN", r, 8)
+# ---------------------------------------------------------------- STKRAIN
+print("\n== STKRAIN ==")
+r = Run("STKRAIN.COM").run(400_000)
+size_gate("STKRAIN", r, 8)
 vals = [word(r, 0xB8000 + a) for a in range(0, 4000, 2)]
 steps = {(a - b) & 0xFFFF for a, b in zip(vals, vals[1:])}
 check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and steps == {1}, f"consecutive screen cells hold consecutive counter values (steps {sorted(steps)})")
@@ -104,12 +104,13 @@ cells = {word(r, 0xB8000 + a) for a in range(0, 4000, 2)}
 check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and cells == {0x0107}, f"the whole screen is the CALL's return address, 0107h: character 07h (a bullet), colour 01h (blue) {sorted(map(hex, cells))}")
 check(len(r.outs) == 0 and not r.unmapped, "it recurses forever without calling anything")
 
-# ---------------------------------------------------------------- XRAY
-print("\n== XRAY ==")
-r = Run("XRAY.COM").run(5000)
-size_gate("XRAY", r, 7)
-check(r.chars[:300] == [i & 255 for i in range(0x100, 0x100 + 300)], "prints the bytes of segment 0 (AX = 0 at entry gives DS = 0) in order from offset 0100h")
-check(len(r.chars) > 800, f"and keeps going ({len(r.chars)} characters)")
+# ---------------------------------------------------------------- SNOW
+print("\n== SNOW ==")
+r = Run("SNOW.COM").run(5000)
+size_gate("SNOW", r, 8)
+want = [((13 * (i + 1)) & 255) | 0x80 for i in range(len(r.chars))]
+check(len(r.chars) > 800 and r.chars == want, f"prints the timer counter (port 40h) with bit 7 forced on, over and over ({len(r.chars)} characters)")
+check(min(r.chars) >= 128 and len(set(r.chars)) > 30, "so only codes 128-255 appear (no control codes to disturb the screen), and plenty of different ones")
 
 # ---------------------------------------------------------------- BREATH
 print("\n== BREATH ==")

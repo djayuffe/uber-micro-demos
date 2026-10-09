@@ -17,5 +17,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes=$(awk -v t="${GITHUB_REF_NAME#v}" '$0 ~ "^## \\[" t "\\]" {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md)
-          gh release create "$GITHUB_REF_NAME" *.COM SHA256SUMS docs/gallery.png \
+          gh release create "$GITHUB_REF_NAME" *.COM SHA256SUMS docs/gallery.jpg \
             --title "UBER micro demos $GITHUB_REF_NAME" --notes "${notes:-See CHANGELOG.md}"
