@@ -1,13 +1,14 @@
 # UBER micro demos
 
-**Thirteen DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints itself, a blizzard of glyphs, a pulsing cursor, and four that make noise.**
+**Eighteen DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, and four that make noise.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
-![Six of the demos in DOSBox: STACKMAP, SPECTRUM, STKRAIN, BULLETS, SNOW and MIRROR](docs/gallery.jpg)
+![Twelve of the demos in DOSBox](docs/gallery.jpg)
 
-*Real DOSBox captures. Top: STACKMAP, SPECTRUM, STKRAIN. Bottom: BULLETS, SNOW, MIRROR (the line under the command, which is
-the program's own machine code). The moving blue cell in STKRAIN and BULLETS is the stack pointer writing the screen.*
+*Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, SNOW, MIRROR (its own machine code under the command),
+PSPBACK (`PSPBACK hello tiny world` prints the command line reversed). Row 3: KEYSCAN (after a key press), STRIPE, TALL (80x50 text) and
+BIG (40x25).*
 
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
@@ -17,16 +18,21 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **STACKMAP** | 7 | the **stack is the screen**, and every cell shows its own address: a map of video memory |
 | **STKRAIN** | 8 | the stack is the screen again, and a counter pours down it: a rainbow of every character |
 | **BULLETS** | 7 | infinite **recursion** with the stack on the screen: every `CALL` pushes a return address, and the screen fills with blue bullets |
+| **STATE** | 7 | the **machine's start-up state**, painted: `pusha` stacks the eight registers DOS left behind, as a tile that repeats across the screen |
 | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
 | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
 | **STRIPE** | 8 | a three-row **colour band** at the cursor, a new colour every timer tick |
+| **PSPBACK** | 7 | reads DOS's own **Program Segment Prefix backwards**: `PSPBACK hello tiny world` prints `dlrow ynit olleh` (and the FCBs, parsed from your arguments) |
 | **MIRROR** | 8 | a program that **prints its own machine code**, then exits cleanly |
 | **BUZZ** | 6 | flips the **PC speaker** as fast as the CPU can: a buzz whose pitch is the CPU speed |
 | **STATIC** | 6 | **white noise**: the timer's fastest-changing bits drive the speaker |
 | **TICKER** | 6 | a **metronome**: the speaker bits step 1, 2, 3, 0 on every 55 ms tick |
 | **GEIGER** | 7 | a **Geiger counter**: random clicks, 18 a second |
 | **TYPER** | 7 | a **typewriter**: whatever you press is echoed back |
+| **KEYSCAN** | 6 | floods the screen with the glyph of the **last keyboard scancode** |
+| **BIG** | 4 | **40x25** text (`inc ax` / `int 10h`: AX = 1 is a video mode), then exits |
+| **TALL** | 6 | **80x50** text (the BIOS reloads the 8x8 font), then exits |
 
 ## Run them
 
@@ -35,15 +41,44 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 
 ```sh
 ./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets snow breath stripe mirror buzz static ticker geiger typer
+./run-dosbox.sh stkrain   # any of: stackmap spectrum stkrain bullets state snow breath stripe mirror pspback keyscan big tall buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
 
-**All but MIRROR never exit** (there is no room for the keyboard check): close DOSBox, or press Ctrl+F9 in it.
+**Only MIRROR, PSPBACK, BIG and TALL exit; the rest never do** (there is no room for the keyboard check): close DOSBox, or press Ctrl+F9 in it.
 **The launcher pins DOSBox to about 3 MIPS** (`cycles=3000` in `DOSBOX.CONF`). These demos have no room for
 timing code, so their speed *is* the CPU's speed: at `cycles=max`, STKRAIN, SNOW, BUZZ and STATIC are an
 unreadable blur or an inaudible whine. BREATH, TICKER and GEIGER pace themselves with `HLT`.
+
+## Found-memory demos
+
+The most interesting direction at this size is not "fit an effect into 8 bytes" but "let the 8 bytes unlock something already
+sitting in the machine". DOS hands a `.COM` a screen full of data, a 256-byte Program Segment Prefix, a stack with a known word on
+it, a known set of registers and the BIOS. Several demos here have almost no renderer at all:
+
+- **PSP as data** (PSPBACK, MIRROR): the program reads DOS's own structures. PSPBACK is the only demo in the *wild* category: it needs a
+  command line (try `PSPBACK hello tiny world`), because the PSP is where DOS parsed it. Reading *forwards* does not work: the command
+  tail ends in a carriage return, and the zeros after it overwrite the text. Backwards, the text lands last.
+- **Stack as art** (STACKMAP, STKRAIN, BULLETS, SPECTRUM): the stack pointer is the cursor, and the screen is the stack.
+- **The environment as the texture** (STATE): nothing is initialised on purpose. `pusha` paints whatever DOS left in `DX` (the segment),
+  `BP`, `CX`, `SI`, `DI`. A different DOS, or a different PC, paints a different screen: the demo has editions. (Entry state in DOSBox 0.74:
+  `AX=0 BX=0 CX=00FF DX=0192 SI=0100 DI=FFFE BP=091C SP=FFFE`, all four segments `0192`, flags `7202`; the DX and flags are one of the
+  things that vary.)
+- **Hardware as the program** (BIG, TALL, BREATH, STRIPE, the speaker demos): one BIOS or port call does all the work.
+
+**Rules of the game.** *Strict 8*: exactly 8 bytes or fewer in the `.COM`, no payload, no data file, an ordinary launch with no
+arguments. Every demo here is strict except PSPBACK, which is *wild* (it reads your command line). KEYSCAN and TYPER want keys.
+
+**What I tried and could not use.**
+- *CRT-controller abuse* (sweeping the start address or horizontal parameters): it needs 11 bytes for the port, the register index and the
+  loop, and wild CRTC values can stress a real monitor, so I did not ship it.
+- *BIOS-ROM hallucination*: DOSBox's BIOS is host-side callbacks, not 8086 code, so there are no accidental instruction streams to find.
+  It would have to be hunted on a real BIOS dump.
+- *Self-walking opcodes*: a program that increments its own `jmp` displacement lands mid-instruction on the second iteration; in the
+  emulator the mis-decoded bytes printed one character and then ended the program. Not an image.
+- *Text-mode scroll feedback*: the BIOS scroll needs a window in `CX`/`DX`, and the entry state (`CX = 00FF`) is an empty window.
+- *DOSBox crashes*: a stack-art variant that pushed `ss` and `sp` alternately closed DOSBox outright; I dropped it.
 
 ## How they work
 
@@ -59,6 +94,21 @@ screen, and as `SP` counts down and wraps around the 64 KB segment it walks acro
 - **STKRAIN**: `inc ax` / `push ax` writes a counter; character = low byte, colour = high byte.
 - **BULLETS**: `call` to itself. The return address `0107h` is pushed over and over: character `07h` (a bullet),
   colour `01h` (blue).
+
+**STATE**: `pusha` is one byte that pushes AX, CX, DX, BX, SP, BP, SI, DI. With the stack on the screen, those eight words become an
+8-cell tile, repeated down the whole page; the SP cell is the only one that changes (it counts down by 16 each time), so it reads as
+a drifting glyph column. The other seven cells are the start-up registers, as DOS left them.
+
+**PSPBACK**: `std` makes `lodsb` walk downwards from `SI = 0100h`, so it reads the PSP backwards: first the zeros after the command
+tail, then the carriage return (which sends the cursor home), then the command line reversed, then the two parsed FCBs (your first two
+arguments, upper-cased and space-padded, also reversed), then the header. `loop` (with `CX = 00FFh`) stops after 255 bytes and `ret`
+returns to the PSP's `INT 20h`.
+
+**KEYSCAN**: `in al,60h` reads the keyboard controller's last byte (the make code when a key goes down, the make code plus 80h when it
+comes up) and `int 29h` prints it, over and over.
+
+**BIG** and **TALL** are the BIOS video functions with the registers DOS provides: AX = 0 at entry, so `inc ax` is "set mode 1" (40x25),
+and `mov ax,1112h` is "load the 8x8 font", which makes the screen 80x50. Both then `ret` to the PSP's `INT 20h`.
 
 **SPECTRUM**: STACKMAP plus one `dec sp`. With `SP` odd, each pushed word lands across two cells: its low byte (a value
 that changes every cell) becomes a *colour attribute*, and its high byte (it changes every 128 cells) the *glyph* of the
@@ -95,7 +145,7 @@ into `AX`, so `AH` is 0 again for the next wait (ASCII keys are below 128, and f
 `.COM` (`AX = BX = 0`, `CX = 00FFh`, `SI = 0100h`, `DI = SP = FFFEh`), with the BIOS keyboard, the timer
 counter and the speaker port emulated. It checks that each is under 9 bytes and within its budget, never touches
 memory outside video memory and its own segment, and then its behaviour: STACKMAP's cells each hold their own
-address; SPECTRUM's colour and glyph bytes are the low and high bytes of the cell address; MIRROR prints exactly its own bytes and exits; STRIPE writes 255 blanks with a counting attribute once per tick; STKRAIN's hold consecutive counter values; BULLETS fills the screen with `0107h`; SNOW prints the counter it
+address; SPECTRUM's colour and glyph bytes are the low and high bytes of the cell address; MIRROR prints exactly its own bytes and exits; STRIPE writes 255 blanks with a counting attribute once per tick; STATE paints the eight start-up registers as a repeating tile; PSPBACK prints the PSP in reverse (including `dlrow ynit olleh`); BIG and TALL make one BIOS call each and exit; KEYSCAN prints the keyboard port; STKRAIN's hold consecutive counter values; BULLETS fills the screen with `0107h`; SNOW prints the counter it
 read, with bit 7 forced on; BREATH sets the cursor shape once per tick, counting up; BUZZ writes 2, 0, 2, 0, ...;
 STATIC and GEIGER write exactly the counter they just read (all four gate/cone combinations occur, GEIGER once per
 tick); TICKER steps the bits once per tick; TYPER echoes the keys it is given. CI runs it on every push; a

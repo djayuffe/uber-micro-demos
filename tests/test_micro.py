@@ -28,8 +28,10 @@ class Run:
         uc.reg_write(UC_X86_REG_SP, 0xFFFE); uc.reg_write(UC_X86_REG_FLAGS, 0x202)
         uc.reg_write(UC_X86_REG_AX, 0); uc.reg_write(UC_X86_REG_BX, 0)
         uc.reg_write(UC_X86_REG_CX, 0xFF); uc.reg_write(UC_X86_REG_SI, 0x100); uc.reg_write(UC_X86_REG_DI, 0xFFFE)
+        uc.reg_write(UC_X86_REG_DX, SEG); uc.reg_write(UC_X86_REG_BP, 0x091C)      # as DOSBox leaves them
         self.outs, self.ints, self.chars, self.unmapped, self.ticks = [], [], [], [], 0
         self.p61, self.pit, self.pit_step = port61, 0, pit_step
+        self.p60 = 0
         self.tick_hook = []
         self.keys = []
         self.dos_strings, self.exited = [], False
@@ -48,6 +50,7 @@ class Run:
 
     def on_in(self, uc, port, size, ud):
         if port == 0x61: return self.p61
+        if port == 0x60: return self.p60
         if port == 0x40:
             self.pit = (self.pit + self.pit_step) & 255
             return self.pit
@@ -192,6 +195,50 @@ size_gate("STRIPE", r, 8)
 writes = [(ax, cx, bx) for n, ax, cx, bx in r.ints if n == 0x10]
 check(len(writes) > 200 and all(ax >> 8 == 9 and ax & 255 == 0 and cx == 0xFF for ax, cx, bx in writes), f"BIOS write-character-and-attribute (AH = 9) of a blank, 255 cells, every time ({len(writes)} calls)")
 check(all(b - a == 1 for a, b in zip([w[2] for w in writes], [w[2] for w in writes][1:])) and r.ticks >= len(writes) - 1, "the attribute (BL) counts up by one per call, with a timer tick between calls: a new colour every 55 ms")
+
+# ---------------------------------------------------------------- BIG
+print("\n== BIG ==")
+r = Run("BIG.COM").run(500)
+size_gate("BIG", r, 4)
+check(r.com == b"\x40\xCD\x10\xC3", "inc ax / int 10h / ret")
+check([ax for n, ax, cx, bx in r.ints if n == 0x10] == [1] and r.exited, "one INT 10h with AX = 1 (video mode 1: 40x25 text), then it exits cleanly")
+
+# ---------------------------------------------------------------- TALL
+print("\n== TALL ==")
+r = Run("TALL.COM").run(500)
+size_gate("TALL", r, 6)
+calls = [(ax, bx) for n, ax, cx, bx in r.ints if n == 0x10]
+check(calls == [(0x1112, 0)] and r.exited, "one INT 10h with AX = 1112h (load the ROM 8x8 font, recompute the screen: 80x50) and BX = 0, then it exits cleanly")
+
+# ---------------------------------------------------------------- KEYSCAN
+print("\n== KEYSCAN ==")
+r = Run("KEYSCAN.COM"); r.p60 = 0x1E
+r.run(3000)
+n1 = len(r.chars); r.p60 = 0x9E; r.run(3000)
+size_gate("KEYSCAN", r, 6)
+check(n1 > 500 and set(r.chars[:n1]) == {0x1E} and set(r.chars[n1 + 5:]) == {0x9E}, "prints whatever the keyboard port (60h) holds, over and over: the make code 1Eh, then the break code 9Eh after the key is released")
+
+# ---------------------------------------------------------------- PSPBACK
+print("\n== PSPBACK ==")
+r = Run("PSPBACK.COM")
+tail = b" hello tiny world\r"
+r.uc.mem_write(LIN + 0x80, bytes([len(tail)]) + tail)           # the command tail DOS would have put in the PSP
+r.run(5000)
+size_gate("PSPBACK", r, 7)
+psp = bytes(r.uc.mem_read(LIN, 0x101))
+check(r.chars == [psp[0x100 - i] for i in range(255)] and r.exited, "prints the 255 bytes at 0100h, 00FFh, 00FEh, ... downwards (the PSP backwards) and then exits cleanly")
+text = bytes(r.chars)
+check(b"dlrow ynit olleh" in text, "so the command line comes out reversed: 'dlrow ynit olleh'")
+
+# ---------------------------------------------------------------- STATE
+print("\n== STATE ==")
+r = Run("STATE.COM").run(400_000)
+size_gate("STATE", r, 7)
+w = [word(r, 0xB8000 + 2 * c) for c in range(2000)]
+want = {0: 0x0100, 1: 0x091C, 3: 0x0000, 4: SEG, 5: 0x00FF, 6: 0x0000, 7: 0xFFFE}     # SI BP (SP) BX DX CX AX DI: PUSHA's order, ascending, one cell off the tile edge
+ok = all(w[c] == want[c % 8] for c in range(2000) if c % 8 in want)
+check(r.uc.reg_read(UC_X86_REG_SS) == 0xB800 and ok, "the screen is an 8-cell tile repeated: SI, BP, (SP), BX, DX, CX, AX, DI exactly as the machine started the program")
+check(len({w[c] for c in range(2, 2000, 8)}) > 100, "and the SP cell of each tile counts down by 16: a glyph column that drifts")
 
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)

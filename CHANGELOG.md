@@ -3,6 +3,16 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.3.0] - 2026-10-10
+
+### Added
+- **Found-memory demos**, after a brief on exploiting machine state instead of drawing: **STATE** (7 bytes: `pusha` paints the
+  start-up registers as a tile), **PSPBACK** (7: reads DOS's Program Segment Prefix backwards, so `PSPBACK hello tiny world` prints
+  `dlrow ynit olleh`; the one *wild* demo, it needs a command line), **KEYSCAN** (6: floods the screen with the last keyboard scancode).
+- **BIG** (4 bytes: 40x25 text) and **TALL** (6: 80x50 text), the smallest programs here; both exit cleanly.
+- README: a "Found-memory demos" section with the strict/wild rules, the DOSBox entry state, and what was tried and not shipped.
+- All five checked live in DOSBox; the gallery is now twelve real captures.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added
