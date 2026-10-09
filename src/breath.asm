@@ -1,8 +1,8 @@
-; BREATH - 8 bytes. The text cursor pulses: its height changes on every timer tick.
+; BREATH - 7 bytes. The text cursor pulses: its height changes on every timer tick.
 BITS 16
 ORG 100h
-    mov ah,1          ; B4 01     BIOS: set cursor shape (CH = start line, CL = end line)
-.l: int 10h           ; CD 10
+    xchg ax,si        ; 96        DOS gives SI = 0100h: AX = 0100h, i.e. AH = 1 (BIOS: set cursor shape)
+.l: int 10h           ; CD 10     CH = start line, CL = end line
     inc cx            ; 41        a new shape...
     hlt               ; F4        ...every 55 ms
     jmp short .l      ; EB F9

@@ -3,6 +3,15 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
 `.COM` files to a GitHub release using that version's section below.
 
+## [1.1.0] - 2026-10-10
+
+### Changed
+- **Three demos shrunk**: BREATH 8 -> **7** bytes (`xchg ax,si` gives `AH = 1` from DOS's `SI = 0100h`), BUZZ 8 -> **6**
+  (`xor al,2` / `out 61h,al`: the `in` was only preserving bits nobody needs), TYPER 8 -> **7** (`cbw` clears `AH`
+  in one byte instead of `xor ah,ah` in two). The size budgets are tightened to match.
+- Checked live in DOSBox: BREATH's cursor changes shape (so `SI = 0100h` holds there) and TYPER echoes one
+  character per key.
+
 ## [1.0.1] - 2026-10-10
 
 ### Fixed

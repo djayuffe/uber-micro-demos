@@ -18,12 +18,12 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **STKRAIN** | 8 | the stack is the screen again, and a counter pours down it: a rainbow of every character |
 | **BULLETS** | 7 | infinite **recursion** with the stack on the screen: every `CALL` pushes a return address, and the screen fills with blue bullets |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
-| **BREATH** | 8 | the text **cursor pulses**: its shape changes every timer tick |
-| **BUZZ** | 8 | flips the **PC speaker** as fast as the CPU can: a buzz whose pitch is the CPU speed |
+| **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
+| **BUZZ** | 6 | flips the **PC speaker** as fast as the CPU can: a buzz whose pitch is the CPU speed |
 | **STATIC** | 6 | **white noise**: the timer's fastest-changing bits drive the speaker |
 | **TICKER** | 6 | a **metronome**: the speaker bits step 1, 2, 3, 0 on every 55 ms tick |
 | **GEIGER** | 7 | a **Geiger counter**: random clicks, 18 a second |
-| **TYPER** | 8 | a **typewriter**: whatever you press is echoed back |
+| **TYPER** | 7 | a **typewriter**: whatever you press is echoed back |
 
 ## Run them
 
@@ -63,14 +63,16 @@ output") prints it. (An earlier demo, XRAY, dumped low memory the same way, and 
 that memory is mostly zeros, and the odd stray byte can switch DOSBox's ANSI emulation to black-on-black text.)
 
 **BREATH**: BIOS `INT 10h` AH = 1 sets the cursor shape from `CX` (start line, end line); `inc cx` and a `HLT`
-(sleep until the next 18.2 Hz tick) animate it.
+(sleep until the next 18.2 Hz tick) animate it. AH = 1 costs one byte: DOS starts a `.COM` with `SI = 0100h`, so
+`xchg ax,si` makes `AX = 0100h`.
 
 **The speaker** (BUZZ, STATIC, TICKER, GEIGER). Port `61h` bit 1 is the speaker cone and bit 0 gates timer 2.
-BUZZ toggles bit 1 in a tight loop. STATIC and GEIGER write the timer's counter (`in al,40h`, which changes every
+BUZZ is `xor al,2` / `out 61h,al` in a loop (`AL` is 0 at entry, so it writes 2, 0, 2, 0, ...). STATIC and GEIGER write the timer's counter (`in al,40h`, which changes every
 0.84 us) straight to port `61h`, so its low bits are a free random number generator: STATIC at full speed, GEIGER
 held for one tick between writes. TICKER counts through the bit patterns once per tick.
 
-**TYPER**: BIOS `INT 16h` with `AH = 0` blocks for a key and returns it in `AL`; `INT 29h` prints it.
+**TYPER**: BIOS `INT 16h` with `AH = 0` blocks for a key and returns it in `AL`; `INT 29h` prints it; `cbw` (one byte) sign-extends `AL`
+into `AX`, so `AH` is 0 again for the next wait (ASCII keys are below 128, and function keys return `AL = 0`).
 
 ## Testing
 
@@ -79,7 +81,7 @@ held for one tick between writes. TICKER counts through the bit patterns once pe
 counter and the speaker port emulated. It checks that each is under 9 bytes and within its budget, never touches
 memory outside video memory and its own segment, and then its behaviour: STACKMAP's cells each hold their own
 address; STKRAIN's hold consecutive counter values; BULLETS fills the screen with `0107h`; SNOW prints the counter it
-read, with bit 7 forced on; BREATH sets the cursor shape once per tick, counting up; BUZZ flips bit 1 on every write;
+read, with bit 7 forced on; BREATH sets the cursor shape once per tick, counting up; BUZZ writes 2, 0, 2, 0, ...;
 STATIC and GEIGER write exactly the counter they just read (all four gate/cone combinations occur, GEIGER once per
 tick); TICKER steps the bits once per tick; TYPER echoes the keys it is given. CI runs it on every push; a
 `vX.Y.Z` tag publishes a release.

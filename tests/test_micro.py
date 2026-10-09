@@ -115,17 +115,18 @@ check(min(r.chars) >= 128 and len(set(r.chars)) > 30, "so only codes 128-255 app
 # ---------------------------------------------------------------- BREATH
 print("\n== BREATH ==")
 r = Run("BREATH.COM", hlt_as_tick=True).run(6000)
-size_gate("BREATH", r, 8)
+size_gate("BREATH", r, 7)
 shapes = [cx for n, ax, cx, bx in r.ints if n == 0x10 and ax >> 8 == 1]
+check(r.com[0] == 0x96, "starts with XCHG AX,SI: DOS gives SI = 0100h, which makes AH = 1 (set cursor shape)")
 check(len(shapes) > 200 and all(b - a == 1 for a, b in zip(shapes, shapes[1:])), f"BIOS set-cursor-shape (AH = 1) once per tick, the shape counting up by one ({len(shapes)} calls)")
 check(r.ticks >= len(shapes) - 1, f"after each call it waits a timer tick (HLT x{r.ticks})")
 
 # ---------------------------------------------------------------- BUZZ
 print("\n== BUZZ ==")
-r = Run("BUZZ.COM", port61=0x30).run(4000)
-size_gate("BUZZ", r, 8)
+r = Run("BUZZ.COM").run(4000)
+size_gate("BUZZ", r, 6)
 vals = [v for p, s, v in r.outs if p == 0x61]
-check(len(vals) > 500 and all(a ^ b == 2 for a, b in zip(vals, vals[1:])), "every write to port 61h flips bit 1 (the speaker cone) and keeps the other bits")
+check(len(vals) > 500 and vals[:4] == [2, 0, 2, 0] and set(vals) == {0, 2}, "port 61h gets 2, 0, 2, 0, ...: bit 1 (the speaker cone) toggles on every write")
 
 # ---------------------------------------------------------------- STATIC
 print("\n== STATIC ==")
@@ -157,9 +158,9 @@ check(r.ticks >= len(outs) - 1, f"held for a whole tick each time (HLT x{r.ticks
 print("\n== TYPER ==")
 r = Run("TYPER.COM"); r.keys = list("hello, world")
 r.run(3000)
-size_gate("TYPER", r, 8)
+size_gate("TYPER", r, 7)
 calls = [ax for n, ax, cx, bx in r.ints if n == 0x16]
-check(len(calls) > 12 and all(ax >> 8 == 0 for ax in calls[:1]), "waits for a key with BIOS INT 16h, AH = 0")
+check(len(calls) > 12 and all(ax >> 8 == 0 for ax in calls), "waits for a key with BIOS INT 16h, AH = 0 on every call (CBW clears the scan code)")
 check(r.chars[:12] == [ord(c) for c in "hello, world"], "and prints each key it gets, in order")
 
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
