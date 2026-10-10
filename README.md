@@ -64,6 +64,10 @@ unreadable blur or an inaudible whine. BREATH, TICKER and GEIGER pace themselves
 
 ## Overlapping instructions
 
+![OVERLAP corroding the DOS screen: the clean DOSBox start-up screen, then text breaking up and blue and green blocks spreading](docs/overlap.gif)
+
+*OVERLAP in real DOSBox 0.74-3 at 3000 cycles, 25 frames per second, 16 seconds. It starts on the untouched DOS screen (a 15-second helper program, not part of the release, waited so the recording could begin clean); then the 64 KB memory walk reaches the text page and the screen corrodes. Recorded by screen-capturing the DOSBox window; a small patch where the mouse pointer sat was painted black.*
+
 OVERLAP, OVERSUB and OVERHEAR (idea from a pasted note on the 8-byte `C5 30 04 AD E6 61 EB F9` trick) run the same bytes
 twice, decoded two ways. Pass 1 is `lds si,[bx+si]` / `add al,0ADh` / `out 61h,al` / `jmp`; the jump lands on the 30h
 inside the first instruction, and from then on the loop is `xor [si],al` / `lodsw` / `out 61h,al` / `jmp`. Two things
