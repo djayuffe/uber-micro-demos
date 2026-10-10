@@ -13,37 +13,39 @@ Row 5: NOISEPAL (one frame of the churn), TALL (80x50), BIG (40x25). Row 6: OVER
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
 
-| Demo | Bytes | What it does |
-|---|---|---|
-| **STACKMAP** | 7 | the **stack is the screen**, and every cell shows its own address: a map of video memory |
-| **STKRAIN** | 8 | the stack is the screen again, and a counter pours down it: a rainbow of every character |
-| **BULLETS** | 7 | infinite **recursion** with the stack on the screen: every `CALL` pushes a return address, and the screen fills with blue bullets |
-| **STATE** | 7 | the **machine's start-up state**, painted: `pusha` stacks the eight registers DOS left behind, as a tile that repeats across the screen |
-| **FLUX** | 8 | STATE with a **second moving column**: `dec cx` makes CX one lower for every tile, so two glyph columns drift |
-| **WEAVE** | 8 | the address map **woven** with SI's start-up value: every other cell is a blank blue one |
-| **EVO1** | 8 | **found by evolution**: a stack segment that overlaps the text page out of phase, with SI and DI drifting: dense columns of glyphs |
-| **EVO2** | 8 | EVO1's cousin (another segment, `cmpsb` for `cmpsw`): a blue wall with colourful glyph strips |
-| **OVERLAP** | 8 | **two programs in the same bytes**: the `JMP` lands one byte inside the first instruction, so `lds si,[bx+si]` becomes `xor [si],al` / `lodsw` / `out 61h,al`. It feeds memory to the speaker and **corrodes the DOS screen** (the walk crosses the text page). Silent over empty memory. |
-| **OVERSUB** | 8 | OVERLAP with `sub` for `xor` (30h becomes 28h, so `lds` loads BP and SI stays put): AL flips ADh, 53h, ADh..., so the speaker toggles on every write, and the screen fills with random characters |
-| **OVERHEAR** | 8 | OVERLAP with `cmp`: the loop only **reads**, so it sends every word of the walked window (the DOS screen's text included) to the speaker port without disturbing the screen |
-| **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
-| **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
-| **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
-| **STRIPE** | 8 | a three-row **colour band** at the cursor, a new colour every timer tick |
-| **PSPBACK** | 7 | reads DOS's own **Program Segment Prefix backwards**: `PSPBACK hello tiny world` prints `dlrow ynit olleh` (and the FCBs, parsed from your arguments) |
-| **MIRROR** | 8 | a program that **prints its own machine code**, then exits cleanly |
-| **BUZZ** | 6 | flips the **PC speaker** as fast as the CPU can: a buzz whose pitch is the CPU speed |
-| **STATIC** | 6 | **white noise**: the timer's fastest-changing bits drive the speaker |
-| **TICKER** | 6 | a **metronome**: the speaker bits step 1, 2, 3, 0 on every 55 ms tick |
-| **GEIGER** | 7 | a **Geiger counter**: random clicks, 18 a second |
-| **TYPER** | 7 | a **typewriter**: whatever you press is echoed back |
-| **KEYSCAN** | 6 | floods the screen with the glyph of the **last keyboard scancode** |
-| **CODEPAL** | 8 | the program's **own machine code becomes the screen's palette**, and the colours stay after it exits (the DOS screen turns salmon and green) |
-| **PSPPAL** | 7 | **DOS's Program Segment Prefix becomes the palette**, then exit: the screen turns blue, purple and green, machine-dependent colours |
-| **NOISEPAL** | 8 | a **palette-only** demo: no pixel is touched; the timer's counter is streamed into all 256 DAC colours, so the screen's colours churn |
-| **MODE3** | 5 | back to **80x25 text** with the default palette: undoes BIG, TALL, CODEPAL and PSPPAL |
-| **BIG** | 4 | **40x25** text (`inc ax` / `int 10h`: AX = 1 is a video mode), then exits |
-| **TALL** | 6 | **80x50** text (the BIOS reloads the 8x8 font), then exits |
+| Preview | Demo | Bytes | What it does |
+|---|---|---:|---|
+| <img src="docs/thumbs/STACKMAP.jpg" width="120" alt="STACKMAP"> | **STACKMAP** | 7 | the **stack is the screen**, and every cell shows its own address: a map of video memory |
+| <img src="docs/thumbs/STKRAIN.jpg" width="120" alt="STKRAIN"> | **STKRAIN** | 8 | the stack is the screen again, and a counter pours down it: a rainbow of every character |
+| <img src="docs/thumbs/BULLETS.jpg" width="120" alt="BULLETS"> | **BULLETS** | 7 | infinite **recursion** with the stack on the screen: every `CALL` pushes a return address, and the screen fills with blue bullets |
+| <img src="docs/thumbs/STATE.jpg" width="120" alt="STATE"> | **STATE** | 7 | the **machine's start-up state**, painted: `pusha` stacks the eight registers DOS left behind, as a tile that repeats across the screen |
+| <img src="docs/thumbs/FLUX.jpg" width="120" alt="FLUX"> | **FLUX** | 8 | STATE with a **second moving column**: `dec cx` makes CX one lower for every tile, so two glyph columns drift |
+| <img src="docs/thumbs/WEAVE.jpg" width="120" alt="WEAVE"> | **WEAVE** | 8 | the address map **woven** with SI's start-up value: every other cell is a blank blue one |
+| <img src="docs/thumbs/EVO1.jpg" width="120" alt="EVO1"> | **EVO1** | 8 | **found by evolution**: a stack segment that overlaps the text page out of phase, with SI and DI drifting: dense columns of glyphs |
+| <img src="docs/thumbs/EVO2.jpg" width="120" alt="EVO2"> | **EVO2** | 8 | EVO1's cousin (another segment, `cmpsb` for `cmpsw`): a blue wall with colourful glyph strips |
+| <img src="docs/thumbs/OVERLAP.jpg" width="120" alt="OVERLAP"> | **OVERLAP** | 8 | **two programs in the same bytes**: the `JMP` lands one byte inside the first instruction, so `lds si,[bx+si]` becomes `xor [si],al` / `lodsw` / `out 61h,al`. It feeds memory to the speaker and **corrodes the DOS screen** (the walk crosses the text page). Silent over empty memory. |
+| <img src="docs/thumbs/OVERSUB.jpg" width="120" alt="OVERSUB"> | **OVERSUB** | 8 | OVERLAP with `sub` for `xor` (30h becomes 28h, so `lds` loads BP and SI stays put): AL flips ADh, 53h, ADh..., so the speaker toggles on every write, and the screen fills with random characters |
+| <img src="docs/thumbs/OVERHEAR.jpg" width="120" alt="OVERHEAR"> | **OVERHEAR** | 8 | OVERLAP with `cmp`: the loop only **reads**, so it sends every word of the walked window (the DOS screen's text included) to the speaker port without disturbing the screen |
+| <img src="docs/thumbs/SPECTRUM.jpg" width="120" alt="SPECTRUM"> | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
+| <img src="docs/thumbs/SNOW.jpg" width="120" alt="SNOW"> | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
+| <img src="docs/thumbs/BREATH.jpg" width="120" alt="BREATH"> | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
+| <img src="docs/thumbs/STRIPE.jpg" width="120" alt="STRIPE"> | **STRIPE** | 8 | a three-row **colour band** at the cursor, a new colour every timer tick |
+| <img src="docs/thumbs/PSPBACK.jpg" width="120" alt="PSPBACK"> | **PSPBACK** | 7 | reads DOS's own **Program Segment Prefix backwards**: `PSPBACK hello tiny world` prints `dlrow ynit olleh` (and the FCBs, parsed from your arguments) |
+| <img src="docs/thumbs/MIRROR.jpg" width="120" alt="MIRROR"> | **MIRROR** | 8 | a program that **prints its own machine code**, then exits cleanly |
+| <img src="docs/thumbs/BUZZ.jpg" width="120" alt="BUZZ"> | **BUZZ** | 6 | flips the **PC speaker** as fast as the CPU can: a buzz whose pitch is the CPU speed |
+| <img src="docs/thumbs/STATIC.jpg" width="120" alt="STATIC"> | **STATIC** | 6 | **white noise**: the timer's fastest-changing bits drive the speaker |
+| <img src="docs/thumbs/TICKER.jpg" width="120" alt="TICKER"> | **TICKER** | 6 | a **metronome**: the speaker bits step 1, 2, 3, 0 on every 55 ms tick |
+| <img src="docs/thumbs/GEIGER.jpg" width="120" alt="GEIGER"> | **GEIGER** | 7 | a **Geiger counter**: random clicks, 18 a second |
+| <img src="docs/thumbs/TYPER.jpg" width="120" alt="TYPER"> | **TYPER** | 7 | a **typewriter**: whatever you press is echoed back |
+| <img src="docs/thumbs/KEYSCAN.jpg" width="120" alt="KEYSCAN"> | **KEYSCAN** | 6 | floods the screen with the glyph of the **last keyboard scancode** |
+| <img src="docs/thumbs/CODEPAL.jpg" width="120" alt="CODEPAL"> | **CODEPAL** | 8 | the program's **own machine code becomes the screen's palette**, and the colours stay after it exits (the DOS screen turns salmon and green) |
+| <img src="docs/thumbs/PSPPAL.jpg" width="120" alt="PSPPAL"> | **PSPPAL** | 7 | **DOS's Program Segment Prefix becomes the palette**, then exit: the screen turns blue, purple and green, machine-dependent colours |
+| <img src="docs/thumbs/NOISEPAL.jpg" width="120" alt="NOISEPAL"> | **NOISEPAL** | 8 | a **palette-only** demo: no pixel is touched; the timer's counter is streamed into all 256 DAC colours, so the screen's colours churn |
+| <img src="docs/thumbs/MODE3.jpg" width="120" alt="MODE3"> | **MODE3** | 5 | back to **80x25 text** with the default palette: undoes BIG, TALL, CODEPAL and PSPPAL |
+| <img src="docs/thumbs/BIG.jpg" width="120" alt="BIG"> | **BIG** | 4 | **40x25** text (`inc ax` / `int 10h`: AX = 1 is a video mode), then exits |
+| <img src="docs/thumbs/TALL.jpg" width="120" alt="TALL"> | **TALL** | 6 | **80x50** text (the BIOS reloads the 8x8 font), then exits |
+
+*Previews are real DOSBox 0.74-3 captures of each program. Five demos have nothing to see, so their preview is a plot of what the emulator says they write: BUZZ, STATIC, TICKER and GEIGER show the speaker cone (port 61h) over time (for STATIC and GEIGER the timer counter is modelled as random values), and BREATH shows the cursor-shape value it sets on each tick. TYPER's capture shows DOSBox's synthetic key injection, which types `a` for every key. MODE3 shows the clean 80x25 screen it restores; OVERHEAR leaves the DOS screen untouched, which is the point.*
 
 ## Run them
 

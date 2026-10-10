@@ -3,6 +3,10 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches every
 `.COM` file to a GitHub release using that version's section below.
 
+## [1.8.1] - 2026-10-10
+
+- README: a preview image for every demo (`docs/thumbs/`): real DOSBox captures, plus emulator plots for the demos with nothing to see.
+
 ## [1.8.0] - 2026-10-10
 
 ### Added
