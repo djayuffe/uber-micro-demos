@@ -3,6 +3,11 @@
 Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches every
 `.COM` file to a GitHub release using that version's section below.
 
+## [1.9.0] - 2026-10-10
+
+### Added
+- **OVERMAX** (8 bytes): OVERLAP maximized. `ADh` becomes `ACh`, so the second program uses `lodsb`: the walk steps one byte at a time and XORs both characters and colours of the DOS screen. Real DOSBox GIF and preview. 30 demos.
+
 ## [1.8.1] - 2026-10-10
 
 - README: a preview image for every demo (`docs/thumbs/`): real DOSBox captures, plus emulator plots for the demos with nothing to see.

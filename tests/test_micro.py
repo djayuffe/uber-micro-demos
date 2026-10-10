@@ -329,6 +329,19 @@ for name, mid, mnem in (("OVERLAP", 0x30, "xor"), ("OVERSUB", 0x28, "sub")):
     after = bytes(r2.uc.mem_read(0xB8000, 4000))
     check(sum(1 for a, b in zip(before, after) if a != b) > 200, "and the walk crosses the B800h text page, so it also corrupts the screen: a noise-and-glitch demo")
 
+# ---------------------------------------------------------------- OVERMAX
+print("\n== OVERMAX ==")
+r = Run("OVERMAX.COM"); size_gate("OVERMAX", r, 8)
+check(r.com == bytes([0xC5, 0x30, 0x04, 0xAC, 0xE6, 0x61, 0xEB, 0xF9]), "bytes C5 30 04 AC E6 61 EB F9: OVERLAP with ACh, so the second program is xor [si],al / lodsb / out 61h,al / jmp")
+rnd = random.Random(3); r.uc.mem_write(0xAC040, bytes(rnd.randrange(256) for _ in range(0x10000)))
+before = bytes(r.uc.mem_read(0xB8000, 4000)); r.run(400_000)
+check(r.uc.reg_read(UC_X86_REG_DS) == 0xAC04, f"pass 1 loads DS = AC04h from the program's own bytes (SI = 0100h at entry)")
+after = bytes(r.uc.mem_read(0xB8000, 4000))
+ch_even = sum(1 for i in range(0, 4000, 2) if before[i] != after[i]); ch_odd = sum(1 for i in range(1, 4000, 2) if before[i] != after[i])
+check(ch_even > 1000 and ch_odd > 1000, f"byte stride: it rewrites characters ({ch_even}) AND colours ({ch_odd}) on the text page; OVERLAP's word stride only reaches one of the two")
+vals = [v for p, s_, v in r.outs if p == 0x61]
+check(len(set(vals)) > 200 and not r.unmapped, f"the speaker port gets the running XOR of the memory it walks ({len(set(vals))} distinct values); no unmapped memory is touched")
+
 # ---------------------------------------------------------------- OVERHEAR
 print("\n== OVERHEAR ==")
 r = Run("OVERHEAR.COM"); size_gate("OVERHEAR", r, 8)
