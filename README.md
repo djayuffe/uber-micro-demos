@@ -136,6 +136,7 @@ made a clearly different picture live in DOSBox are FLUX (`dec cx` in the `pusha
 - *Self-walking opcodes*: a program that increments its own `jmp` displacement lands mid-instruction on the second iteration; in the
   emulator the mis-decoded bytes printed one character and then ended the program. Not an image.
 - *Text-mode scroll feedback*: the BIOS scroll needs a window in `CX`/`DX`, and the entry state (`CX = 00FF`) is an empty window.
+- *Self-copying screen flows* (`push B800h / pop es / es movsw / jmp`, 8 bytes; and 9-byte `es lodsw / stosb` and `es lodsb / stosw` variants): DOS starts SI 258 bytes ahead of DI, so each pass shifts the screen diagonally, and the walk reaches the video BIOS ROM, whose bytes flow in as a lattice of repeating glyph clusters. It looks good for about three seconds, then stops: a pure copy has no new input, so the screen settles into a pattern whose period equals the displacement, which the shift leaves unchanged (or into the empty upper text pages). The reversed (`std`) copy reaches the same fixed point. OVERLAP and OVERMAX avoid this because the XOR keeps feeding a running value back in.
 - *Keyboard LEDs as pixels*: the controller needs an acknowledgement between the command byte and the data byte, and nothing here can show whether it works.
 - *DOSBox crashes*: a stack-art variant that pushed `ss` and `sp` alternately closed DOSBox outright; I dropped it.
 
