@@ -329,5 +329,15 @@ for name, mid, mnem in (("OVERLAP", 0x30, "xor"), ("OVERSUB", 0x28, "sub")):
     after = bytes(r2.uc.mem_read(0xB8000, 4000))
     check(sum(1 for a, b in zip(before, after) if a != b) > 200, "and the walk crosses the B800h text page, so it also corrupts the screen: a noise-and-glitch demo")
 
+# ---------------------------------------------------------------- OVERHEAR
+print("\n== OVERHEAR ==")
+r = Run("OVERHEAR.COM"); size_gate("OVERHEAR", r, 8)
+check(r.com == bytes([0xC5, 0x38, 0x04, 0xAD, 0xE6, 0x61, 0xEB, 0xF9]), "bytes C5 38 04 AD E6 61 EB F9: the OVERLAP trick with 38h, so the loop is cmp [si],al / lodsw / out 61h,al / jmp")
+r.uc.mem_write(0xAD040, bytes(i & 255 for i in range(0x10000)))
+before = bytes(r.uc.mem_read(0xAD040, 0x10000)); r.run(60_000)
+vals = [v for p, s_, v in r.outs if p == 0x61]
+check(vals[0] == 0xAD and vals[1:200] == [(0x100 + 2 * k) & 255 for k in range(199)], "after the first ADh it sends the low byte of each successive word of the window to the speaker port: it reads the memory out loud")
+check(bytes(r.uc.mem_read(0xAD040, 0x10000)) == before and r.uc.reg_read(UC_X86_REG_DS) == 0xAD04, "and it never writes: the memory it walks (which includes the B800h text page) is untouched")
+
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED:\n  - " + "\n  - ".join(fails))
 sys.exit(1 if fails else 0)

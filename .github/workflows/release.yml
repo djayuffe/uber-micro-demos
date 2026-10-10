@@ -1,5 +1,5 @@
 name: Release
-# Push a tag like v1.0.0 to build, test and publish the ten .COM files.
+# Push a tag like v1.0.0 to build, test and publish every .COM file.
 on:
   push:
     tags: ["v*"]

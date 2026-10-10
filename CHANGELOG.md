@@ -1,9 +1,18 @@
 # Changelog
 
-Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches the ten
-`.COM` files to a GitHub release using that version's section below.
+Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds, tests and attaches every
+`.COM` file to a GitHub release using that version's section below.
 
-## [1.7.0] - 2026-10-09
+## [1.8.0] - 2026-10-10
+
+### Added
+- **OVERHEAR** (8 bytes): the overlapping-instruction trick with `cmp`, so the loop reads the walked window (the DOS screen's text included) to the speaker port and never writes. 29 demos.
+- README: the trick's eight-way family tested and summarised; gallery gains the OVERLAP and OVERSUB captures.
+
+### Fixed
+- Stale wording: the changelog header, the release workflow comment and the build comment still said "ten"; the gallery caption and test description now cover the overlap demos.
+
+## [1.7.0] - 2026-10-10
 
 ### Added
 - **OVERLAP** and **OVERSUB** (8 bytes each): overlapping-instruction demos (a jump into the middle of the first instruction). They walk the VGA/text

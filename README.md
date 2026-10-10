@@ -1,14 +1,14 @@
 # UBER micro demos
 
-**Twenty-eight DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, four that make noise, and two that are two programs in the same eight bytes.**
+**Twenty-nine DOS demos, each under 9 bytes of x86 assembly: the screen painted by the stack, a program that prints its own machine code, one that reverses your command line, one that shows the state DOS left the CPU in, four that make noise, and three that are two programs in the same eight bytes.**
 
 [![CI](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml/badge.svg)](https://github.com/djayuffe/uber-micro-demos/actions/workflows/ci.yml)
 
-![Nineteen of the demos in DOSBox](docs/gallery.jpg)
+![Twenty-one of the demos in DOSBox](docs/gallery.jpg)
 
 *Real DOSBox captures. Row 1: STACKMAP, SPECTRUM, STKRAIN, BULLETS. Row 2: STATE, FLUX, WEAVE, EVO1. Row 3: EVO2, SNOW, MIRROR, PSPBACK
 (`PSPBACK hello tiny world`). Row 4: KEYSCAN (after a key press), STRIPE, CODEPAL, PSPPAL (the two that recolour the DOS screen and exit).
-Row 5: NOISEPAL (one frame of the churn), TALL (80x50), BIG (40x25).*
+Row 5: NOISEPAL (one frame of the churn), TALL (80x50), BIG (40x25). Row 6: OVERLAP (the DOS screen corroding) and OVERSUB (random characters).*
 
 None of them sets a video mode, loads a file or allocates memory. They use what DOS hands a `.COM` for
 free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) and bend it:
@@ -25,6 +25,7 @@ free (`AX = BX = 0`, `SI = 100h`, text mode 3, the BIOS and the PC's hardware) a
 | **EVO2** | 8 | EVO1's cousin (another segment, `cmpsb` for `cmpsw`): a blue wall with colourful glyph strips |
 | **OVERLAP** | 8 | **two programs in the same bytes**: the `JMP` lands one byte inside the first instruction, so `lds si,[bx+si]` becomes `xor [si],al` / `lodsw` / `out 61h,al`. It feeds memory to the speaker and **corrodes the DOS screen** (the walk crosses the text page). Silent over empty memory. |
 | **OVERSUB** | 8 | OVERLAP with `sub` for `xor` (30h becomes 28h, so `lds` loads BP and SI stays put): AL flips ADh, 53h, ADh..., so the speaker toggles on every write, and the screen fills with random characters |
+| **OVERHEAR** | 8 | OVERLAP with `cmp`: the loop only **reads**, so it sends every word of the walked window (the DOS screen's text included) to the speaker port without disturbing the screen |
 | **SPECTRUM** | 8 | STACKMAP with the stack **one byte off**: every word straddles two cells, so the colour changes every cell and the glyph every 128: a test card |
 | **SNOW** | 8 | a **blizzard** of random glyphs: the timer's fast counter, forced into codes 128-255 |
 | **BREATH** | 7 | the text **cursor pulses**: its shape changes every timer tick |
@@ -50,8 +51,8 @@ Download the `.COM` files from the [latest release](../../releases/latest) and r
 [DOSBox](https://www.dosbox.com/) (`mount c .`, `c:`, `STKRAIN.COM`), or build and launch:
 
 ```sh
-./build.sh                  # NASM: assembles all ten and enforces each size budget
-./run-dosbox.sh stkrain   # any of: overlap oversub stackmap spectrum stkrain bullets state flux weave evo1 evo2 snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
+./build.sh                  # NASM: assembles every demo and enforces each size budget
+./run-dosbox.sh stkrain   # any of: overlap oversub overhear stackmap spectrum stkrain bullets state flux weave evo1 evo2 snow breath stripe mirror pspback keyscan big tall codepal psppal noisepal mode3 buzz static ticker geiger typer
 ```
 
 Needs [NASM](https://www.nasm.us/) (macOS: `brew install nasm`, `brew install --cask dosbox`).
@@ -63,13 +64,13 @@ unreadable blur or an inaudible whine. BREATH, TICKER and GEIGER pace themselves
 
 ## Overlapping instructions
 
-OVERLAP and OVERSUB (idea from a pasted note on the 8-byte `C5 30 04 AD E6 61 EB F9` trick) run the same bytes
+OVERLAP, OVERSUB and OVERHEAR (idea from a pasted note on the 8-byte `C5 30 04 AD E6 61 EB F9` trick) run the same bytes
 twice, decoded two ways. Pass 1 is `lds si,[bx+si]` / `add al,0ADh` / `out 61h,al` / `jmp`; the jump lands on the 30h
 inside the first instruction, and from then on the loop is `xor [si],al` / `lodsw` / `out 61h,al` / `jmp`. Two things
 the note got wrong, found by running it: DOS enters a `.COM` with `SI = 0100h`, not 0, so `lds` reads the **program's own bytes**
 (DS = AD04h, SI = 30C5h), not the PSP; and that window (AD040h-BD03Fh) **includes the B800h text page**, so it is
 not harmless in text mode: it scrambles the screen. Over empty memory the XOR version is silent (AL stays ADh),
-which is why OVERSUB exists. Both are checked in the emulator; the sound itself is unheard, and with no delay the
+which is why OVERSUB exists. The trick generalises: `C5 mm` is `lds reg,[bx+si]` and `mm 04` is `op [si],al`, and the eight ALU opcodes 00, 08, ..., 38 are exactly the legal modrm bytes, so one byte picks the operation. Tried in the emulator: `sub` and `sbb` always toggle the speaker, `xor`, `add`, `adc` need data in memory, `or` and `and` collapse to a constant, and `cmp` never writes, which is OVERHEAR. Both are checked in the emulator; the sound itself is unheard, and with no delay the
 tone is far above hearing range, so any audible result is aliasing in the audio path.
 
 ## Found-memory demos
@@ -212,10 +213,10 @@ memory outside video memory and its own segment, and then its behaviour: STACKMA
 address; SPECTRUM's colour and glyph bytes are the low and high bytes of the cell address; MIRROR prints exactly its own bytes and exits; STRIPE writes 255 blanks with a counting attribute once per tick; STATE paints the eight start-up registers as a repeating tile; PSPBACK prints the PSP in reverse (including `dlrow ynit olleh`); BIG and TALL make one BIOS call each and exit; KEYSCAN prints the keyboard port; STKRAIN's hold consecutive counter values; BULLETS fills the screen with `0107h`; SNOW prints the counter it
 read, with bit 7 forced on; BREATH sets the cursor shape once per tick, counting up; BUZZ writes 2, 0, 2, 0, ...;
 STATIC and GEIGER write exactly the counter they just read (all four gate/cone combinations occur, GEIGER once per
-tick); TICKER steps the bits once per tick; TYPER echoes the keys it is given. CI runs it on every push; a
+tick); TICKER steps the bits once per tick; TYPER echoes the keys it is given; OVERLAP, OVERSUB and OVERHEAR decode as two programs, drive the speaker port from memory, and (OVERHEAR) never write. CI runs it on every push; a
 `vX.Y.Z` tag publishes a release.
 
-**Run live in DOSBox**: STACKMAP, SPECTRUM, STKRAIN, BULLETS, SNOW and MIRROR (captured above), STRIPE (the band changes colour), BREATH (the cursor visibly changes
+**Run live in DOSBox**: OVERLAP and OVERSUB (captured above; OVERHEAR runs and leaves the screen untouched), STACKMAP, SPECTRUM, STKRAIN, BULLETS, SNOW and MIRROR (captured above), STRIPE (the band changes colour), BREATH (the cursor visibly changes
 shape between frames) and TYPER (it echoes one character per key; DOSBox's synthetic key injection sent them all as
 `a`, which is the injection tool, not TYPER). **What nothing here can tell you**: how BUZZ, STATIC, TICKER and
 GEIGER *sound* (the tests check the exact port writes, not the audio), or how any of it looks on a real VGA.
