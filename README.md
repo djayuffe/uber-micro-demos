@@ -86,6 +86,19 @@ not harmless in text mode: it scrambles the screen. Over empty memory the XOR ve
 which is why OVERSUB exists. The trick generalises: `C5 mm` is `lds reg,[bx+si]` and `mm 04` is `op [si],al`, and the eight ALU opcodes 00, 08, ..., 38 are exactly the legal modrm bytes, so one byte picks the operation. Tried in the emulator: `sub` and `sbb` always toggle the speaker, `xor`, `add`, `adc` need data in memory, `or` and `and` collapse to a constant, and `cmp` never writes, which is OVERHEAR. Both are checked in the emulator; the sound itself is unheard, and with no delay the
 tone is far above hearing range, so any audible result is aliasing in the audio path.
 
+## In motion
+
+| | |
+|---|---|
+| ![FLUX](docs/flux.gif) | ![EVO1](docs/evo1.gif) |
+| **FLUX**: the register tile with CX one lower every time, so its column drifts. | **EVO1**: the evolved stack segment, out of phase with the screen; SI and DI drift. |
+| ![EVO2](docs/evo2.gif) | ![SNOW](docs/snow.gif) |
+| **EVO2**: EVO1's cousin, stepping one byte at a time. | **SNOW**: the timer counter printed as glyphs 128-255. |
+| ![OVERSUB](docs/oversub.gif) | |
+| **OVERSUB**: the SUB version of the overlap trick fills the screen with random characters. | |
+
+*These five were rendered frame by frame from the real binaries in the emulated CPU, not screen-recorded: the text screen is drawn from video memory with the VGA ROM font and the DOS start-up screen, both dumped from inside DOSBox. Time is modelled as DOSBox's `cycles=3000` (about 120,000 instructions per GIF frame at 25 fps); SNOW's timer counter is modelled as random values. OVERLAP's and OVERMAX's GIFs (above) are real DOSBox recordings.*
+
 ## Found-memory demos
 
 The most interesting direction at this size is not "fit an effect into 8 bytes" but "let the 8 bytes unlock something already
